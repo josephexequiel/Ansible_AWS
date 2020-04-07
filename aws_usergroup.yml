@@ -1,0 +1,22 @@
+---
+  - name: User and Group Creation
+    hosts: aws_servers
+    gather_facts: false
+    remote_user: ubuntu
+    become: yes
+    pre_tasks:
+       - name: 'Install python2'
+         raw: sudo apt-get -y install python
+    tasks:
+       - name: Create group teacher
+         group:
+           name: teacher
+           state: present
+       - name: Add User fred to group teacher
+         user:
+           name: fred
+           shell: /bin/bash
+           groups: teacher
+           append: yes
+       - name: 'Verify user fred'
+         raw: id fred

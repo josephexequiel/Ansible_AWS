@@ -1,0 +1,11 @@
+---
+  - name: Install Git on AWS Server
+    hosts: aws_servers
+    gather_facts: false
+    remote_user: ubuntu
+    become: yes
+    tasks:
+      - name: Install latest version of Git
+        apt:
+          name: git
+          state: latest

@@ -1,0 +1,65 @@
+---
+  - name: Provision EC2 Instances
+    hosts: local
+    connection: local
+    gather_facts: False
+    tags: provisioning
+    # These variables needs to be declared to properly create the EC2 instances
+    vars:
+      instance_type: t2.micro
+      security_group: aws-sggroup # Declare the security group name here
+      image: ami-0d1cd67c26f5fca19 # Ubuntu 18.04 x86_64 Public Image will be used for this example
+      keypair: aws_key # Declare the AWS key pair that we want to use for these instances
+      region: us-west-2 # Change the Region here
+      count: 4 # This is the number of instances you want to create
+
+    # Task that will be used to Launch/Create an EC2 Instance
+    tasks:
+      - name: Security group creation
+        local_action:
+          module: ec2_group # AWS module to access the EC2 security group API
+          name: "{{ security_group }}"
+          description: Security Group for Exercise
+          region: "{{ region }}"
+          rules: # Declare rules here. For this script, we will use the default SSH port 22.
+            - proto: tcp
+              from_port: 22
+              to_port: 22
+              cidr_ip: 0.0.0.0/0
+          rules_egress:
+            - proto: all
+              cidr_ip: 0.0.0.0/0
+        register: basic_firewall
+
+      - name: Launch the new EC2 Instance
+        local_action: ec2
+                      group={{ security_group }}
+                      instance_type={{ instance_type}}
+                      image={{ image }}
+                      wait=true
+                      region={{ region }}
+                      keypair={{ keypair }}
+                      count={{count}}
+        register: ec2
+
+      - name: Add the newly created EC2 instance(s) to the local host group (located inside the directory)
+        local_action: lineinfile
+                      dest="./aws_hosts"
+                      regexp={{ item.public_ip }}
+                      insertafter="[aws_servers]" line={{ item.public_ip }}
+        with_items: '{{ ec2.instances }}'
+
+
+      - name: Wait for SSH to come up
+        local_action: wait_for
+                      host={{ item.public_ip }}
+                      port=22
+                      state=started
+        with_items: '{{ ec2.instances }}'
+
+      - name: Add tag to Instance(s)
+        local_action: ec2_tag resource={{ item.id }} region={{ region }} state=present
+        with_items: '{{ ec2.instances }}'
+        args:
+          tags:
+            Name: aws_ec2_device
